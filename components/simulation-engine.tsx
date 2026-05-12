@@ -1,22 +1,30 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Settings,
-  Atom,
-  Orbit,
-  Waves,
-  Zap,
-} from "lucide-react";
+import { Play, Pause, RotateCcw, Settings, Atom, Orbit, Waves, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type SimulationType = "pendulum" | "particles" | "wave" | "nbody";
 
 interface SimulationEngineProps {
-  onDataUpdate: (data: Array<{ t: number; value: number }>) => void;
+  onDataUpdate: () => void;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+}
+
+interface Body {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  mass: number;
+  color: string;
 }
 
 export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
@@ -29,40 +37,39 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
     mass: 1,
     dt: 0.016,
   });
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const stateRef = useRef({
     angle: Math.PI / 4,
     angularVelocity: 0,
     time: 0,
-    particles: [] as Array<{ x: number; y: number; vx: number; vy: number; color: string }>,
+    particles: [] as Particle[],
     wavePhase: 0,
-    bodies: [] as Array<{ x: number; y: number; vx: number; vy: number; mass: number; color: string }>,
+    bodies: [] as Body[],
   });
-  const dataRef = useRef<Array<{ t: number; value: number }>>([]);
 
   const initializeSimulation = useCallback(() => {
     stateRef.current.time = 0;
-    dataRef.current = [];
 
     if (simulationType === "pendulum") {
       stateRef.current.angle = Math.PI / 4;
       stateRef.current.angularVelocity = 0;
     } else if (simulationType === "particles") {
       stateRef.current.particles = Array.from({ length: 50 }, () => ({
-        x: Math.random() * 300 + 50,
-        y: Math.random() * 200 + 50,
+        x: Math.random() * 350 + 25,
+        y: Math.random() * 200 + 25,
         vx: (Math.random() - 0.5) * 4,
         vy: (Math.random() - 0.5) * 4,
-        color: `oklch(${0.6 + Math.random() * 0.2} 0.18 ${Math.random() * 360})`,
+        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
       }));
     } else if (simulationType === "wave") {
       stateRef.current.wavePhase = 0;
     } else if (simulationType === "nbody") {
       stateRef.current.bodies = [
-        { x: 200, y: 150, vx: 0, vy: 1, mass: 100, color: "oklch(0.7 0.18 30)" },
-        { x: 280, y: 150, vx: 0, vy: -2, mass: 10, color: "oklch(0.7 0.18 180)" },
-        { x: 120, y: 150, vx: 0, vy: 2, mass: 10, color: "oklch(0.7 0.18 120)" },
+        { x: 200, y: 150, vx: 0, vy: 1, mass: 100, color: "#f97316" },
+        { x: 280, y: 150, vx: 0, vy: -2, mass: 10, color: "#22d3ee" },
+        { x: 120, y: 150, vx: 0, vy: 2, mass: 10, color: "#4ade80" },
       ];
     }
   }, [simulationType]);
@@ -74,8 +81,23 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.fillStyle = "oklch(0.13 0.02 260)";
+    ctx.fillStyle = "#0a0a12";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "#1a1a2e";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 20) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 20) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
 
     const state = stateRef.current;
     state.time += params.dt;
@@ -89,33 +111,29 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
       state.angle += state.angularVelocity * params.dt * 60;
 
       const pivotX = canvas.width / 2;
-      const pivotY = 30;
+      const pivotY = 40;
       const bobX = pivotX + Math.sin(state.angle) * length * 100;
       const bobY = pivotY + Math.cos(state.angle) * length * 100;
 
-      ctx.strokeStyle = "oklch(0.5 0 0)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(pivotX, pivotY);
       ctx.lineTo(bobX, bobY);
       ctx.stroke();
 
-      ctx.fillStyle = "oklch(0.7 0.18 180)";
+      ctx.fillStyle = "#22d3ee";
       ctx.beginPath();
       ctx.arc(pivotX, pivotY, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "oklch(0.65 0.2 30)";
-      ctx.shadowColor = "oklch(0.65 0.2 30)";
-      ctx.shadowBlur = 15;
+      ctx.shadowColor = "#f97316";
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = "#f97316";
       ctx.beginPath();
       ctx.arc(bobX, bobY, 20, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-
-      dataRef.current.push({ t: state.time, value: state.angle });
-      if (dataRef.current.length > 200) dataRef.current.shift();
-      onDataUpdate([...dataRef.current]);
     } else if (simulationType === "particles") {
       state.particles.forEach((p) => {
         p.x += p.vx;
@@ -124,62 +142,59 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
         p.vy *= 1 - params.damping;
         p.vx *= 1 - params.damping * 0.5;
 
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -0.9;
-        if (p.y < 0 || p.y > canvas.height) {
+        if (p.x < 5 || p.x > canvas.width - 5) {
+          p.vx *= -0.9;
+          p.x = Math.max(5, Math.min(canvas.width - 5, p.x));
+        }
+        if (p.y < 5 || p.y > canvas.height - 5) {
           p.vy *= -0.9;
-          p.y = Math.max(0, Math.min(canvas.height, p.y));
+          p.y = Math.max(5, Math.min(canvas.height - 5, p.y));
         }
 
-        ctx.fillStyle = p.color;
         ctx.shadowColor = p.color;
         ctx.shadowBlur = 10;
+        ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.shadowBlur = 0;
-
-      const avgY =
-        state.particles.reduce((sum, p) => sum + p.y, 0) / state.particles.length;
-      dataRef.current.push({ t: state.time, value: avgY });
-      if (dataRef.current.length > 200) dataRef.current.shift();
-      onDataUpdate([...dataRef.current]);
     } else if (simulationType === "wave") {
       state.wavePhase += 0.05;
-      ctx.strokeStyle = "oklch(0.7 0.18 180)";
+
+      ctx.strokeStyle = "#22d3ee";
       ctx.lineWidth = 3;
-      ctx.shadowColor = "oklch(0.7 0.18 180)";
+      ctx.shadowColor = "#22d3ee";
       ctx.shadowBlur = 10;
       ctx.beginPath();
 
       for (let x = 0; x < canvas.width; x++) {
         const y =
           canvas.height / 2 +
-          Math.sin((x * 0.02) + state.wavePhase) * 50 +
-          Math.sin((x * 0.01) + state.wavePhase * 0.5) * 30;
+          Math.sin(x * 0.02 + state.wavePhase) * 50 +
+          Math.sin(x * 0.01 + state.wavePhase * 0.5) * 30;
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
 
-      ctx.strokeStyle = "oklch(0.65 0.2 30 / 0.5)";
+      ctx.strokeStyle = "#f97316";
+      ctx.lineWidth = 2;
+      ctx.shadowColor = "#f97316";
       ctx.beginPath();
       for (let x = 0; x < canvas.width; x++) {
         const y =
           canvas.height / 2 +
-          Math.sin((x * 0.03) + state.wavePhase * 1.5) * 30 +
-          Math.sin((x * 0.015) + state.wavePhase * 0.8) * 20;
+          Math.sin(x * 0.03 + state.wavePhase * 1.5) * 30 +
+          Math.sin(x * 0.015 + state.wavePhase * 0.8) * 20;
         if (x === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
-
-      dataRef.current.push({ t: state.time, value: Math.sin(state.wavePhase) });
-      if (dataRef.current.length > 200) dataRef.current.shift();
-      onDataUpdate([...dataRef.current]);
     } else if (simulationType === "nbody") {
       const G = 0.5;
+
       state.bodies.forEach((b1, i) => {
         let ax = 0;
         let ay = 0;
@@ -201,28 +216,25 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
         b.x += b.vx;
         b.y += b.vy;
 
-        ctx.fillStyle = b.color;
+        if (b.x < 0 || b.x > canvas.width) b.vx *= -0.5;
+        if (b.y < 0 || b.y > canvas.height) b.vy *= -0.5;
+        b.x = Math.max(0, Math.min(canvas.width, b.x));
+        b.y = Math.max(0, Math.min(canvas.height, b.y));
+
         ctx.shadowColor = b.color;
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = b.color;
         ctx.beginPath();
         ctx.arc(b.x, b.y, Math.sqrt(b.mass) * 2, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.shadowBlur = 0;
-
-      const totalEnergy = state.bodies.reduce(
-        (sum, b) => sum + 0.5 * b.mass * (b.vx * b.vx + b.vy * b.vy),
-        0
-      );
-      dataRef.current.push({ t: state.time, value: totalEnergy });
-      if (dataRef.current.length > 200) dataRef.current.shift();
-      onDataUpdate([...dataRef.current]);
     }
 
     if (isRunning) {
       animationRef.current = requestAnimationFrame(simulate);
     }
-  }, [simulationType, params, isRunning, onDataUpdate]);
+  }, [simulationType, params, isRunning]);
 
   useEffect(() => {
     initializeSimulation();
@@ -247,7 +259,7 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
   ];
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-4">
+    <div className="flex h-full flex-col gap-4 overflow-auto">
       <div className="rounded-lg border border-border bg-card p-4">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
           <Settings className="h-4 w-4 text-primary" />
@@ -311,7 +323,7 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
               onChange={(e) =>
                 setParams({ ...params, gravity: Number(e.target.value) })
               }
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
           <div>
@@ -327,7 +339,7 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
               onChange={(e) =>
                 setParams({ ...params, length: Number(e.target.value) })
               }
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
           <div>
@@ -343,7 +355,7 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
               onChange={(e) =>
                 setParams({ ...params, damping: Number(e.target.value) })
               }
-              className="w-full accent-accent"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-accent"
             />
           </div>
           <div>
@@ -359,7 +371,7 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
               onChange={(e) =>
                 setParams({ ...params, dt: Number(e.target.value) })
               }
-              className="w-full accent-accent"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-accent"
             />
           </div>
         </div>
@@ -369,13 +381,8 @@ export function SimulationEngine({ onDataUpdate }: SimulationEngineProps) {
         <h3 className="mb-4 text-sm font-medium text-foreground">
           Simulation Viewport
         </h3>
-        <div className="flex items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary/30">
-          <canvas
-            ref={canvasRef}
-            width={400}
-            height={300}
-            className="max-w-full"
-          />
+        <div className="flex items-center justify-center overflow-hidden rounded-lg border border-border bg-[#0a0a12]">
+          <canvas ref={canvasRef} width={400} height={300} className="max-w-full" />
         </div>
       </div>
     </div>

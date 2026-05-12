@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Image,
+  ImageIcon,
   Upload,
   Sliders,
   RotateCcw,
@@ -12,12 +12,11 @@ import {
   Droplet,
   Filter,
   Grid3X3,
-  Maximize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImageProcessingProps {
-  onProcessImage: (operation: string, params: Record<string, number>) => void;
+  onProcessImage: (operation: string) => void;
 }
 
 export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
@@ -29,7 +28,6 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
   const [rotation, setRotation] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,12 +49,12 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
     setSelectedFilter(null);
   };
 
-  const applyKernel = (kernelType: string) => {
-    setSelectedFilter(kernelType);
-    onProcessImage(kernelType, { brightness, contrast, saturation });
+  const applyFilter = (filterId: string) => {
+    setSelectedFilter(filterId);
+    onProcessImage(filterId);
   };
 
-  useEffect(() => {
+  const drawImage = useCallback(() => {
     if (!imageSrc || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
@@ -68,29 +66,44 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
     img.src = imageSrc;
 
     img.onload = () => {
-      imageRef.current = img;
-      canvas.width = img.width;
-      canvas.height = img.height;
+      const maxWidth = 400;
+      const maxHeight = 300;
+      let width = img.width;
+      let height = img.height;
 
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      if (height > maxHeight) {
+        width = (width * maxHeight) / height;
+        height = maxHeight;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.rotate((rotation * Math.PI) / 180);
       ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`;
+      let filterStr = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+      if (blur > 0) filterStr += ` blur(${blur}px)`;
+      if (selectedFilter === "grayscale") filterStr += " grayscale(100%)";
+      if (selectedFilter === "sepia") filterStr += " sepia(100%)";
+      if (selectedFilter === "invert") filterStr += " invert(100%)";
 
-      if (selectedFilter === "grayscale") {
-        ctx.filter += " grayscale(100%)";
-      } else if (selectedFilter === "sepia") {
-        ctx.filter += " sepia(100%)";
-      } else if (selectedFilter === "invert") {
-        ctx.filter += " invert(100%)";
-      }
-
-      ctx.drawImage(img, 0, 0);
+      ctx.filter = filterStr;
+      ctx.drawImage(img, 0, 0, width, height);
       ctx.restore();
     };
   }, [imageSrc, brightness, contrast, saturation, blur, rotation, selectedFilter]);
+
+  useEffect(() => {
+    drawImage();
+  }, [drawImage]);
 
   const filters = [
     { id: "grayscale", label: "Grayscale" },
@@ -98,7 +111,6 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
     { id: "invert", label: "Invert" },
     { id: "edge", label: "Edge Detect" },
     { id: "sharpen", label: "Sharpen" },
-    { id: "blur_kernel", label: "Gaussian Blur" },
   ];
 
   const kernelOperations = [
@@ -109,10 +121,10 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
   ];
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-4">
+    <div className="flex h-full flex-col gap-4 overflow-auto">
       <div className="rounded-lg border border-border bg-card p-4">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
-          <Image className="h-4 w-4 text-primary" />
+          <ImageIcon className="h-4 w-4 text-primary" />
           Image Processing
         </h3>
 
@@ -148,7 +160,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               max="200"
               value={brightness}
               onChange={(e) => setBrightness(Number(e.target.value))}
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
           <div>
@@ -161,7 +173,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               max="200"
               value={contrast}
               onChange={(e) => setContrast(Number(e.target.value))}
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
           <div>
@@ -174,7 +186,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               max="200"
               value={saturation}
               onChange={(e) => setSaturation(Number(e.target.value))}
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
           <div>
@@ -187,14 +199,14 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               max="10"
               value={blur}
               onChange={(e) => setBlur(Number(e.target.value))}
-              className="w-full accent-primary"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-primary"
             />
           </div>
         </div>
 
         <div className="mt-4">
           <label className="mb-1 block text-xs text-muted-foreground">
-            Rotation: {rotation}°
+            Rotation: {rotation} deg
           </label>
           <input
             type="range"
@@ -202,7 +214,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
             max="360"
             value={rotation}
             onChange={(e) => setRotation(Number(e.target.value))}
-            className="w-full accent-accent"
+            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-secondary accent-accent"
           />
         </div>
       </div>
@@ -218,7 +230,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               key={filter.id}
               variant={selectedFilter === filter.id ? "default" : "outline"}
               size="sm"
-              onClick={() => applyKernel(filter.id)}
+              onClick={() => applyFilter(filter.id)}
             >
               {filter.label}
             </Button>
@@ -234,7 +246,7 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
               key={op.id}
               variant="secondary"
               size="sm"
-              onClick={() => applyKernel(op.id)}
+              onClick={() => applyFilter(op.id)}
             >
               {op.label}
             </Button>
@@ -243,21 +255,13 @@ export function ImageProcessing({ onProcessImage }: ImageProcessingProps) {
       </div>
 
       <div className="flex-1 rounded-lg border border-border bg-card p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">Preview</h3>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex min-h-48 items-center justify-center overflow-auto rounded-lg border border-border bg-secondary/30">
+        <h3 className="mb-4 text-sm font-medium text-foreground">Preview</h3>
+        <div className="flex min-h-48 items-center justify-center overflow-auto rounded-lg border border-border bg-secondary/30 p-4">
           {imageSrc ? (
-            <canvas
-              ref={canvasRef}
-              className="max-h-64 max-w-full object-contain"
-            />
+            <canvas ref={canvasRef} className="max-w-full" />
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <ZoomIn className="h-8 w-8" />
+              <ZoomIn className="h-12 w-12 opacity-50" />
               <span className="text-sm">Upload an image to process</span>
             </div>
           )}
